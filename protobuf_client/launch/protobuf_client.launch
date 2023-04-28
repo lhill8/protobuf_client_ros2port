@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <arg name="gateway_port" default="9502"/>
+  <arg name="gateway_ip" default="127.0.0.1"/>
+  <arg name="send_to_gateway_topic" default="/send_to_gateway_cora"/>
+  
+  <node pkg="protobuf_client" type="protobuf_client"
+	name="protobuf_client" output="screen" >
+    <param name="gateway_port" value="$(arg gateway_port"/>
+    <param name="gateway_ip" value="$(arg gateway_ip"/>
+    <param name="send_to_gateway_topic" value="$(arg send_to_gateway_topic"/>
+  </node>
+
+
+</launch>
