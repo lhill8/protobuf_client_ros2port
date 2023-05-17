@@ -1,117 +1,108 @@
 cmake_minimum_required(VERSION 3.5)
 project(protobuf_client)
 
+# Default to C++14
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 14)
+endif()
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-#add_compile_options(-std=c++14)
-set(CMAKE_CXX_STANDARD 14) 
-
-## Find catkin and any catkin packages
-#find_package(catkin REQUIRED COMPONENTS
-#		    roscpp
-#		    std_msgs
-#		    genmsg
-#		    rospy
-#		    )
-
+# find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(ament_cmake_python REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(builtin_interfaces REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(Boost REQUIRED COMPONENTS)
+find_package(Protobuf REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(protobuf_messages REQUIRED)
-find_package(rclpy REQUIRED)
+find_package(class_loader REQUIRED)
+find_package(rclcpp_components REQUIRED)
+find_package(protobuf_client_interfaces REQUIRED)  # Custom Msg for protobuf_client
 
-#find_package(rosidl_default_generators REQUIRED)
-
-
-## System dependencies are found with CMake's conventions                                               
-find_package(Boost REQUIRED COMPONENTS system)
-find_package(Protobuf REQUIRED)                                                                    
-
-
-message("libprotobuf >= 2.5.0")                                                                       
+message("libprotobuf >= 2.5.0")
 set(PROTOBUF_ALLOW_ALIAS "option allow_alias = true;")
 set(Protobuf_INCLUDE_DIRS include/protobuf_client)
-#set(protobuf_messages_DIR ../protobuf_messages)
 
-## Generate messages in the 'msg' folder
-#add_message_files(
-#  FILES
-#  Gateway.msg
-#  )
-
-#find_package(message_package REQUIRED)
-find_package(protobuf_messages REQUIRED)
-
-
-## Generate added messages and services
-#rosidl_generate_interfaces(DEPENDENCIES std_msgs)
-
-## Declare a catkin package
-#catkin_package()
-
-## Build 
+## Build                                                                                                
 include_directories(include include/protobuf_client include/lib_gateway_tcp
-			    #${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${PROTOBUF_INCLUDE_DIRS}
-				rclcpp ${Boost_INCLUDE_DIRS} ${PROTOBUF_INCLUDE_DIRS})
-# lib/proto is a directory to store the raw gateway.proto msg
+			    rclcpp ${Boost_INCLUDE_DIRS} ${PROTOBUF_INCLUDE_DIRS}
+			    ${B64_LIBRARIES})
+
+# lib/proto is a directory to store the raw gateway.proto msg 
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS include/protobuf_client/ lib/proto/gateway.proto)
-# NOTE: need to fix proto generation so it builds to correct directory
-# Had to copy in the .pb.h .pb.c files into my include from build/protobuf_client/ 
 
-
-
+# Library: gateway_protobuf
 add_library(gateway_protobuf include/protobuf_client/gateway.pb.cc)
-add_library(gateway_tcp
-	lib/lib_gateway_tcp/tcp_client.cpp
-	lib/lib_gateway_tcp/tcp_server.cpp
-	lib/lib_gateway_tcp/tcp_session.cpp
-	include/lib_gateway_tcp/tcp_client.h
-	include/lib_gateway_tcp/tcp_server.h
-	include/lib_gateway_tcp/tcp_session.h
-	)
+
+install(
+  TARGETS gateway_protobuf
+  EXPORT gateway_protobuf
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include/gateway_protobuf
+  )	   
 
 
+# Library: gateway_tcp_lib
+add_library(gateway_tcp_lib                                                                             
+  lib/lib_gateway_tcp/tcp_client.cpp
+  lib/lib_gateway_tcp/tcp_server.cpp
+  lib/lib_gateway_tcp/tcp_session.cpp
+  #include/lib_gateway_tcp/tcp_client.h
+  #include/lib_gateway_tcp/tcp_server.h
+  #include/lib_gateway_tcp/tcp_session.h
+  )
 
-target_link_libraries(gateway_tcp ${Boost_LIBRARIES}
-				  rclcpp
-				  ${PROTOBUF_LIBRARY}
-				  ${B64_LIBRARIES})
+target_link_libraries(gateway_tcp_lib
+  ${Boost_LIBRARIES}
+  ${PROTOBUF_LIBRARY}
+  b64)
 
-add_executable(protobuf_client
-  nodes/protobuf_client.cpp
-  nodes/protobuf_client_node.cpp)
+ament_target_dependencies(gateway_tcp_lib
+  ${B64_LIBRARIES}
+  ${Boost_LIBRARIES})
+ament_export_targets(gateway_tcp_lib HAS_LIBRARY_TARGET)
+ament_target_dependencies(gateway_tcp_lib
+  PUBLIC)
 
-#target_include_directories(protobuf_client
-#  PUBLIC
-#    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-#    $<INSTALL_INTERFACE:include>)
-  
-#target_link_libraries(protobuf_client ${catkin_LIBRARIES}
-#				      gateway_protobuf
-#				      ${PROTOBUF_LIBRARY}
-#				      gateway_tcp
-#				      )  # ${Boost_LIBRARIES}
-#target_link_libraries(protobuf_client
-ament_target_dependencies(protobuf_client
-					  rclcpp
-					  #protobuf_messages
-					  std_msgs
-					  rclpy
-				      #gateway_protobuf
-				      ${PROTOBUF_LIBRARY}
-				      gateway_tcp
-				      )
+install(
+  TARGETS gateway_tcp_lib 
+  EXPORT gateway_tcp_lib
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include/lib_gateway_tcp
+  )
 
 
+# Node: protobuf_client_node
+add_executable(protobuf_client_node 
+  src/protobuf_client_node.cpp)
+target_link_libraries(protobuf_client_node
+  gateway_tcp_lib
+  gateway_protobuf
+  ${PROTOBUF_LIBRARY}
+  ${Boost_LIBRARIES})
+ament_target_dependencies(protobuf_client_node
+  rclcpp
+  Boost
+  class_loader
+  std_msgs
+  protobuf_client_interfaces
+  rclcpp_components)
 
-#catkin_install_python(PROGRAMS scripts/publish_to_gateway.py
-ament_python_install_package(${PROJECT_NAME})
-install(PROGRAMS 
-	scripts/publish_to_gateway.py
-    #DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-  	DESTINATION lib/${PROJECT_NAME}
-)
+install(TARGETS
+  protobuf_client_node
+  DESTINATION lib/${PROJECT_NAME})
+
+install(DIRECTORY include/ DESTINATION include/gateway_tcp_lib)
+install(DIRECTORY include/ DESTINATION include/gateway_protobuf)
+ament_export_targets(gateway_protobuf HAS_LIBRARY_TARGET)
+ament_export_dependencies(rclcpp)
+
 
 ament_package()

@@ -1,6 +1,7 @@
-Header header
+std_msgs/Header header
 
 float64 gateway_double
 string  gateway_string
 string  gateway_key
-time    gateway_time
+builtin_interfaces/Time    gateway_time
+

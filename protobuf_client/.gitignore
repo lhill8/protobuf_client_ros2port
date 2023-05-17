@@ -10,10 +10,11 @@ __pycache__/
 *.pyc
 
 # MOOS related
-targ_*
-LOG_*/
-bin/
-build/
+#targ_*
+#LOG_*/
+#bin/
+#build/
+#lib/
 
 #ROS related
 *settings.yaml
@@ -23,3 +24,7 @@ build/
 .\#*
 \#*\#
 *.bag
+
+# CHAMP related
+*.dem
+attic/
